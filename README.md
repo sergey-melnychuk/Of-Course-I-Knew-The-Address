@@ -48,6 +48,17 @@ curl -X POST http://localhost:3001/route
 ## The funds have been routed.
 ```
 
+```
+## Keep the serveer running, open a new console tab:
+
+cd app
+pnpm i
+pnpm dev
+
+## Open http://localhost:3000 in browser.
+
+```
+
 ### Sample deployments on Sepolia
 
 ```

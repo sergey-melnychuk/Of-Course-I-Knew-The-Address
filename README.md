@@ -108,3 +108,15 @@ deployed:  0x3f96d72c589994b3173ba18433a31bfbd9457c5d
 all addresses match. deployer contract: 0x9957cCe0B4Bb631015e0AaBE13979b6f76110265
 test eth::tests::deploy_all ... ok
 ```
+
+---
+
+### Screenshots
+
+Screenshots are in [`./doc`](./doc).
+
+![Screen 1](./doc/screen1.png)
+
+![Screen 2](./doc/screen2.png)
+
+![Screen 3](./doc/screen3.png)

@@ -1,10 +1,17 @@
 use alloy::{
     network::EthereumWallet,
-    primitives::{Address, FixedBytes},
+    primitives::{Address, FixedBytes, U256},
     providers::{Provider, ProviderBuilder},
     signers::local::PrivateKeySigner,
     sol,
 };
+
+/// Fetch ETH balance in wei for an address; returns 32-byte big-endian.
+pub async fn get_balance(rpc_url: &str, address: Address) -> anyhow::Result<[u8; 32]> {
+    let provider = ProviderBuilder::new().connect_http(rpc_url.parse()?);
+    let balance: U256 = provider.get_balance(address).await?;
+    Ok(balance.to_be_bytes())
+}
 
 sol! {
     #[sol(rpc)]
@@ -67,7 +74,21 @@ pub async fn deploy_proxies(
         .connect_http(rpc_url.parse()?);
 
     let deployer = IDeterministicProxyDeployer::new(deployer_address, &provider);
-    let call = deployer.deployMultiple(salts);
+
+    let predicted = deployer
+        .calculateDestinationAddresses(salts.clone())
+        .call()
+        .await?;
+
+    let mut non_proxies = Vec::new();
+    for (address, salt) in predicted.into_iter().zip(salts.into_iter()) {
+        let code = provider.get_code_at(address).await?;
+        if code.is_empty() {
+            non_proxies.push(salt);
+        }
+    }
+
+    let call = deployer.deployMultiple(non_proxies);
 
     // Simulate to get all deployed addresses.
     let addrs = call.call().await?;

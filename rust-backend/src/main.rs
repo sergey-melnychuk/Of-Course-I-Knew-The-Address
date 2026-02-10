@@ -72,6 +72,7 @@ struct DepositResponse {
     user: String,
     salt: String,
     address: String,
+    balance: String,
     status: String,
     created_at: String,
     updated_at: String,
@@ -89,11 +90,25 @@ struct RouteResults {
     txs: Vec<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct AddressSelector {
+    address: Option<String>,
+}
+
 async fn execute_routing(
     State(state): State<Arc<AppState>>,
+    body: String,
 ) -> Result<(StatusCode, Json<RouteResults>), AppError> {
+    let address = serde_json::from_str::<AddressSelector>(&body)
+        .ok()
+        .and_then(|a| a.address)
+        .map(|a| validate_hex(&a, 20, "address"))
+        .transpose()?;
+    let limit = if address.is_some() { 1 } else { 0 };
     let filters = db::DepositFilters {
-        status: Some("pending".to_string()),
+        status: vec!["pending".to_string(), "proxied".to_string()],
+        address,
+        limit,
         ..Default::default()
     };
     let deposits = db::query_deposits(&state.db, &filters).await?;
@@ -114,6 +129,7 @@ async fn execute_routing(
     // But for now for the scope of a take-home task I believe it's good enough.
     let salts = deposits
         .iter()
+        .filter(|d| !d.status.eq_ignore_ascii_case("proxied"))
         .map(|d| FixedBytes::try_from(d.salt.as_slice()))
         .collect::<Result<_, _>>()?;
     eth::deploy_proxies(
@@ -148,10 +164,15 @@ async fn execute_routing(
                 )
                 .await?;
 
-                sqlx::query("UPDATE deposits SET status = 'routed' WHERE id = ?")
+                if !tx.is_zero() {
+                    sqlx::query(
+                        "UPDATE deposits SET status = 'routed', balance = NULL WHERE id = ?",
+                    )
                     .bind(deposit.id)
                     .execute(&state.db)
                     .await?;
+                }
+
                 Ok::<_, anyhow::Error>(tx)
             }
         })
@@ -224,7 +245,11 @@ async fn query_deposits(
             .as_deref()
             .map(|a| validate_hex(a, 20, "address"))
             .transpose()?,
-        status: params.status,
+        status: params
+            .status
+            .as_deref()
+            .map(|s| s.split(',').map(|s| s.trim().to_string()).collect())
+            .unwrap_or_default(),
         limit: params.limit.unwrap_or(10).min(100),
         offset: params.offset.unwrap_or(0).max(0),
     };
@@ -238,6 +263,7 @@ async fn query_deposits(
             user: encode_hex(&r.user),
             salt: encode_hex(&r.salt),
             address: encode_hex(&r.address),
+            balance: encode_hex(&r.balance),
             status: r.status,
             created_at: r.created_at,
             updated_at: r.updated_at,
@@ -245,6 +271,42 @@ async fn query_deposits(
         .collect();
 
     Ok(Json(deposits))
+}
+
+async fn poll_balances(state: Arc<AppState>) -> anyhow::Result<()> {
+    let filters = db::DepositFilters {
+        status: vec!["pending".to_string(), "proxied".to_string()],
+        ..Default::default()
+    };
+
+    let deposits = db::query_deposits(&state.db, &filters).await?;
+    let mut tx = state.db.begin().await?;
+
+    for deposit in deposits {
+        if let Ok(balance) = eth::get_balance(
+            &state.config.sepolia_rpc_url,
+            Address::from_slice(&deposit.address),
+        )
+        .await
+        {
+            let result = sqlx::query("UPDATE deposits SET balance = ? WHERE id = ?")
+                .bind(&balance[..])
+                .bind(deposit.id)
+                .execute(&mut *tx)
+                .await;
+
+            if let Err(e) = result {
+                tracing::warn!(error = %e, "failed to update balance");
+            }
+        } else {
+            tracing::warn!(
+                address = encode_hex(&deposit.address),
+                "failed to get balance"
+            );
+        }
+    }
+    tx.commit().await?;
+    Ok(())
 }
 
 #[tokio::main]
@@ -265,6 +327,20 @@ async fn main() {
         db: pool,
         config: config.clone(),
     });
+
+    // Keep polling balance updates in background.
+    let poll_balance_delay = std::env::var("POLL_BALANCE_DELAY").unwrap_or_else(|_| "60".into());
+    let poll_balance_delay = poll_balance_delay.parse::<u64>().unwrap_or(60);
+    let poll_balance_delay = std::time::Duration::from_secs(poll_balance_delay);
+    {
+        let state = state.clone();
+        tokio::spawn(async move {
+            loop {
+                let _ = poll_balances(state.clone()).await;
+                tokio::time::sleep(poll_balance_delay).await;
+            }
+        });
+    }
 
     let app = Router::new()
         .route("/deposits", get(query_deposits))

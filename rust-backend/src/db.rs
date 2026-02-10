@@ -25,7 +25,7 @@ pub struct DepositFilters {
     pub user: Option<Vec<u8>>,
     pub salt: Option<Vec<u8>>,
     pub address: Option<Vec<u8>>,
-    pub status: Option<String>,
+    pub status: Vec<String>,
     pub limit: i64,
     pub offset: i64,
 }
@@ -35,6 +35,7 @@ pub struct DepositRow {
     pub user: Vec<u8>,
     pub salt: Vec<u8>,
     pub address: Vec<u8>,
+    pub balance: Vec<u8>,
     pub status: String,
     pub created_at: String,
     pub updated_at: String,
@@ -66,7 +67,7 @@ pub async fn query_deposits(
     filters: &DepositFilters,
 ) -> anyhow::Result<Vec<DepositRow>> {
     let mut sql = String::from(
-        "SELECT id, user, salt, address, status, created_at, updated_at \
+        "SELECT id, user, salt, address, balance, status, created_at, updated_at \
          FROM deposits WHERE 1=1",
     );
     if filters.user.is_some() {
@@ -78,10 +79,13 @@ pub async fn query_deposits(
     if filters.address.is_some() {
         sql.push_str(" AND address = ?");
     }
-    if filters.status.is_some() {
+    if !filters.status.is_empty() {
         sql.push_str(" AND status = ?");
+        for _ in filters.status.iter().skip(1) {
+            sql.push_str(" OR status = ?");
+        }
     }
-    sql.push_str(" ORDER BY created_at DESC");
+    sql.push_str(" ORDER BY created_at ASC");
     if filters.limit > 0 {
         sql.push_str(" LIMIT ?");
     }
@@ -99,8 +103,10 @@ pub async fn query_deposits(
     if let Some(ref addr) = filters.address {
         query = query.bind(addr.as_slice());
     }
-    if let Some(ref status) = filters.status {
-        query = query.bind(status.as_str());
+    if !filters.status.is_empty() {
+        for status in filters.status.iter() {
+            query = query.bind(status.as_str());
+        }
     }
     if filters.limit > 0 {
         query = query.bind(filters.limit);
@@ -118,6 +124,7 @@ pub async fn query_deposits(
             user: row.get("user"),
             salt: row.get("salt"),
             address: row.get("address"),
+            balance: row.get("balance"),
             status: row.get("status"),
             created_at: row.get("created_at"),
             updated_at: row.get("updated_at"),

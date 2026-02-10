@@ -4,6 +4,7 @@ import "./IFundRouter.sol";
 
 interface IERC20 {
     function transfer(address to, uint256 value) external returns (bool);
+
     function balanceOf(address who) external view returns (uint256);
 }
 
@@ -18,10 +19,12 @@ contract FundRouter is IFundRouter {
     error ZeroTreasury();
     /// @dev External storage contract with allowlists.
     address public immutable STORAGE;
+
     constructor(address storageContract) {
         require(storageContract != address(0), "storage=0");
         STORAGE = storageContract;
     }
+
     /// @dev Minimal interface to the storage contract.
     function _isAllowedCaller(address a) internal view returns (bool ok) {
         // TODO: call FundRouterStorage.isAllowedCaller(a)
@@ -30,10 +33,12 @@ contract FundRouter is IFundRouter {
         // For now, pretend false to force candidate to implement.
         ok = false;
     }
+
     function _isAllowedTreasury(address a) internal view returns (bool ok) {
         // TODO: call FundRouterStorage.isAllowedTreasury(a) and return result.
         ok = false;
     }
+
     /// @inheritdoc IFundRouter
     function transferFunds(
         uint256 etherAmount,
@@ -70,6 +75,7 @@ contract FundRouter is IFundRouter {
             // e.g. require(IERC20(token).transfer(treasuryAddress,amt), "ERC20 transfer failed");
         }
     }
+
     // Accept ETH so proxies can push value here.
     receive() external payable {}
 }

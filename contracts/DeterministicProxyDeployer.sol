@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
+
 /// @title DeterministicProxyDeployer (skeleton)
 /// @notice Deploys minimal proxies that forward to FUND_ROUTER_ADDRESS via CREATE2.
 /// @dev A few pieces are deliberately stubbed with TODOs.
@@ -8,10 +9,12 @@ contract DeterministicProxyDeployer {
     address public immutable FUND_ROUTER_ADDRESS;
     error Create2Failed();
     error InvalidBytecode();
+
     constructor(address fundRouter) {
         require(fundRouter != address(0), "router=0");
         FUND_ROUTER_ADDRESS = fundRouter;
     }
+
     // ---- Bytecode helpers ----------------------------------------------------
     /// @notice Returns the init code used for CREATE2 deployments.
     /// @dev TODO: Candidate must implement this to return a minimal forwarding proxy
@@ -26,6 +29,7 @@ contract DeterministicProxyDeployer {
         // Revert for now so it compiles.
         revert InvalidBytecode();
     }
+
     /// @notice Per-caller salt derivation to avoid collisions across different users.
     /// @dev Candidates can keep this as-is or modify in place if they justify.
     function _deriveSalt(
@@ -34,6 +38,7 @@ contract DeterministicProxyDeployer {
     ) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(userSalt, caller));
     }
+
     // ---- Public API ----------------------------------------------------------
     function deployMultiple(
         bytes32[] calldata salts
@@ -51,6 +56,7 @@ contract DeterministicProxyDeployer {
             addrs[i] = addr;
         }
     }
+
     /// @notice Pure address calculation (preview) for a given list of salts.
     /// @dev Uses CREATE2 formula with the same derived salt logic as deployMultiple().
     function calculateDestinationAddresses(

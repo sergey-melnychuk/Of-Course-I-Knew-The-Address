@@ -20,6 +20,7 @@ pub async fn connect(url: &str) -> SqlitePool {
     pool
 }
 
+#[derive(Default)]
 pub struct DepositFilters {
     pub user: Option<Vec<u8>>,
     pub salt: Option<Vec<u8>>,
@@ -80,7 +81,13 @@ pub async fn query_deposits(
     if filters.status.is_some() {
         sql.push_str(" AND status = ?");
     }
-    sql.push_str(" ORDER BY created_at DESC LIMIT ? OFFSET ?");
+    sql.push_str(" ORDER BY created_at DESC");
+    if filters.limit > 0 {
+        sql.push_str(" LIMIT ?");
+    }
+    if filters.offset > 0 {
+        sql.push_str(" OFFSET ?");
+    }
 
     let mut query = sqlx::query(&sql);
     if let Some(ref user) = filters.user {
@@ -95,8 +102,12 @@ pub async fn query_deposits(
     if let Some(ref status) = filters.status {
         query = query.bind(status.as_str());
     }
-    query = query.bind(filters.limit);
-    query = query.bind(filters.offset);
+    if filters.limit > 0 {
+        query = query.bind(filters.limit);
+    }
+    if filters.offset > 0 {
+        query = query.bind(filters.offset);
+    }
 
     let rows = query.fetch_all(pool).await?;
 

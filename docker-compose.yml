@@ -1,0 +1,15 @@
+services:
+  fund-router:
+    build: .
+    ports:
+      - "80:3001"
+    env_file: rust-backend/.env
+    environment:
+      LISTEN_ADDR: "0.0.0.0:3001"
+      DATABASE_URL: "sqlite:///data/fund-router.db?mode=rwc"
+    volumes:
+      - data:/data
+    restart: unless-stopped
+
+volumes:
+  data:

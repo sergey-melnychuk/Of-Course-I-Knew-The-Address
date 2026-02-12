@@ -1,0 +1,8 @@
+node_modules
+app/node_modules
+app/dist
+app/.vite
+rust-backend/target
+.git
+doc/
+*.md

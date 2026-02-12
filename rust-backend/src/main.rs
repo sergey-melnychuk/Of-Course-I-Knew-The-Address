@@ -12,7 +12,7 @@ use axum::{
     Json, Router,
     extract::{Query, State},
     http::StatusCode,
-    response::{IntoResponse, Response},
+    response::{Html, IntoResponse, Response},
     routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
@@ -342,19 +342,27 @@ async fn main() {
         });
     }
 
-    let app = Router::new()
+    let api = Router::new()
         .route("/deposits", get(query_deposits))
         .route("/deposits", post(insert_deposit))
         .route("/route", post(execute_routing))
-        .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
         .with_state(state);
+
+    let app = Router::new()
+        .nest("/api", api)
+        .fallback(get(index))
+        .layer(TraceLayer::new_for_http());
 
     info!(addr = %config.listen_addr, "listening");
     let listener = tokio::net::TcpListener::bind(&config.listen_addr)
         .await
         .unwrap();
     axum::serve(listener, app).await.unwrap();
+}
+
+async fn index() -> Html<&'static str> {
+    Html(include_str!("../../app/dist/index.html"))
 }
 
 struct AppError(StatusCode, anyhow::Error);

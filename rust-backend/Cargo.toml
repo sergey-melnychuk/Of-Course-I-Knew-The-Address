@@ -17,4 +17,4 @@ dotenv = "0.15.0"
 rand = "0.10.0"
 tiny-keccak = { version = "2", features = ["keccak"] }
 futures = "0.3"
-alloy = { version = "1", features = ["provider-http", "contract", "signer-local", "json", "network"] }
+alloy = { version = "1", features = ["provider-http", "contract", "signer-local", "signer-mnemonic", "json", "network", "eips", "rpc-types"] }

@@ -260,4 +260,90 @@ mod tests {
         assert_eq!(predicted[0], simulated[0], "predicted != deployed");
         println!("\nall addresses match. deployer contract: {deployer_addr}");
     }
+
+    /// Revoke an EIP-7702 delegation by sending a type-4 transaction that
+    /// delegates to address(0).
+    ///
+    /// PRIVATE_KEY  — the account whose delegation is being revoked (signs the authorization).
+    /// SENDER_PRIVATE_KEY — a funded account that pays for gas and submits the tx.
+    ///                      Falls back to PRIVATE_KEY if not set.
+    ///
+    /// Run with: cargo test revoke_eip7702 -- --ignored --nocapture
+    #[tokio::test]
+    #[ignore = "Sends a real tx to Sepolia"]
+    async fn revoke_eip7702() {
+        use alloy::{
+            eips::eip7702::Authorization,
+            network::{TransactionBuilder, TransactionBuilder7702},
+            primitives::U256,
+            providers::Provider,
+            rpc::types::TransactionRequest,
+            signers::SignerSync,
+        };
+
+        dotenv::dotenv().ok();
+
+        let rpc_url = std::env::var("SEPOLIA_RPC_URL").expect("SEPOLIA_RPC_URL");
+        let private_key = "0xcafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabe";
+
+        // The account whose delegation we want to revoke.
+        let authority: PrivateKeySigner = private_key.parse().expect("bad PRIVATE_KEY");
+        let account = authority.address();
+        println!("account (delegation to revoke): {account}");
+
+        // Funded sender from mnemonic (pays gas on behalf of the account).
+        use alloy::signers::local::{MnemonicBuilder, coins_bip39::English};
+        let phrase = "kick sail purity east trade tomato climb raw latin pioneer surround cargo";
+        let sender = MnemonicBuilder::<English>::default()
+            .phrase(phrase)
+            .index(0)
+            .unwrap()
+            .build()
+            .expect("bad mnemonic");
+        println!("sender  (pays gas):             {}", sender.address());
+        println!("sender private key:             {}", sender.to_bytes());
+        let wallet = EthereumWallet::from(sender);
+
+        let provider = ProviderBuilder::new()
+            .wallet(wallet)
+            .connect_http(rpc_url.parse().unwrap());
+
+        let nonce = provider
+            .get_transaction_count(account)
+            .await
+            .expect("get_transaction_count failed");
+        println!("account nonce: {nonce}");
+
+        // Authorization that delegates to address(0) = revoke.
+        let auth = Authorization {
+            chain_id: U256::from(11155111u64), // Sepolia
+            address: Address::ZERO,
+            nonce,
+        };
+
+        // The *authority* (account owner) signs the authorization.
+        let sig = authority
+            .sign_hash_sync(&auth.signature_hash())
+            .expect("sign failed");
+        let signed_auth = auth.into_signed(sig);
+
+        // The *sender* submits the type-4 tx (to the account being cleared).
+        let tx = TransactionRequest::default()
+            .with_to(account)
+            .with_authorization_list(vec![signed_auth]);
+
+        let pending = provider
+            .send_transaction(tx)
+            .await
+            .expect("send_transaction failed");
+        println!("tx hash: {}", pending.tx_hash());
+
+        let receipt = pending.get_receipt().await.expect("get_receipt failed");
+        println!(
+            "included in block {}",
+            receipt.block_number.expect("no block number")
+        );
+        assert!(receipt.status(), "revocation tx reverted");
+        println!("EIP-7702 delegation revoked for {account}");
+    }
 }

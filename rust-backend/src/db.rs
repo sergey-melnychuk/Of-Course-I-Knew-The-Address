@@ -80,10 +80,11 @@ pub async fn query_deposits(
         sql.push_str(" AND address = ?");
     }
     if !filters.status.is_empty() {
-        sql.push_str(" AND status = ?");
+        sql.push_str(" AND ( status = ?");
         for _ in filters.status.iter().skip(1) {
             sql.push_str(" OR status = ?");
         }
+        sql.push_str(" )");
     }
     sql.push_str(" ORDER BY created_at ASC");
     if filters.limit > 0 {

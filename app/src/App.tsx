@@ -1,5 +1,3 @@
-"use client";
-
 import { useCallback, useEffect, useRef, useState } from "react";
 
 function useClickOutside(ref: React.RefObject<HTMLElement | null>, onClose: () => void) {
@@ -35,7 +33,7 @@ const API = "/api";
 const PAGE_SIZES = [10, 25, 50, 100] as const;
 const REFRESH_INTERVALS = [0, 10, 30, 60, 120] as const; // 0 = off
 
-export default function Home() {
+export default function App() {
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState<number | null>(null);
@@ -145,7 +143,19 @@ export default function Home() {
   };
 
   const copy = async (e: React.MouseEvent, value: string) => {
-    await navigator.clipboard.writeText(value);
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      // Clipboard API requires HTTPS; fall back to execCommand for HTTP.
+      const ta = document.createElement("textarea");
+      ta.value = value;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
     setToast({ x: e.clientX, y: e.clientY });
     setTimeout(() => setToast(null), 1200);
   };
@@ -178,7 +188,7 @@ export default function Home() {
     "w-full rounded border border-zinc-300 bg-white px-3 py-1.5 font-mono text-xs placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:placeholder:text-zinc-600";
 
   return (
-    <div className="min-h-screen bg-zinc-50 p-8 font-[family-name:var(--font-geist-sans)] dark:bg-zinc-950">
+    <div className="min-h-screen bg-zinc-50 p-8 dark:bg-zinc-950">
       <div className="mx-auto max-w-5xl">
         <h1 className="mb-6 text-2xl font-semibold tracking-tight">
           Deposits

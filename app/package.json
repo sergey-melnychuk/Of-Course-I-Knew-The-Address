@@ -4,7 +4,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "test": "vitest --run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "react": "^19.2.3",
@@ -14,10 +16,14 @@
     "@tailwindcss/vite": "^4",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@testing-library/react": "^16.0.1",
+    "@testing-library/jest-dom": "^6.6.3",
     "@vitejs/plugin-react": "^4",
+    "jsdom": "^26.0.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vite": "^6",
-    "vite-plugin-singlefile": "^2"
+    "vite-plugin-singlefile": "^2",
+    "vitest": "^2.1.8"
   }
 }

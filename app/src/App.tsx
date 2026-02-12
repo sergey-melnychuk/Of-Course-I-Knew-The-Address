@@ -163,18 +163,6 @@ export default function App() {
   const truncate = (hex: string) =>
     hex.length > 16 ? `${hex.slice(0, 10)}…${hex.slice(-8)}` : hex;
 
-  const weiToEth = (hexWei: string): string => {
-    const raw = hexWei.startsWith("0x") ? hexWei.slice(2) : hexWei;
-    if (!raw || /^0+$/i.test(raw)) return "0";
-    const wei = BigInt("0x" + raw);
-    const div = BigInt(10) ** BigInt(18);
-    const int = wei / div;
-    const frac = (wei % div).toString().padStart(18, "0").replace(/0+$/, "");
-    if (!frac) return int.toString();
-    const decimals = frac.slice(0, 6);
-    return `${int}.${decimals}`;
-  };
-
   const statusColor: Record<string, string> = {
     pending:
       "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
@@ -485,6 +473,18 @@ function ErrorModal({
       </div>
     </div>
   );
+}
+
+export function weiToEth(hexWei: string): string {
+  const raw = hexWei.startsWith("0x") ? hexWei.slice(2) : hexWei;
+  if (!raw || /^0+$/i.test(raw)) return "0";
+  const wei = BigInt("0x" + raw);
+  const div = BigInt(10) ** BigInt(18);
+  const int = wei / div;
+  const frac = (wei % div).toString().padStart(18, "0").replace(/0+$/, "");
+  if (!frac) return int.toString();
+  const decimals = frac.slice(0, 6);
+  return `${int}.${decimals}`;
 }
 
 function Actions({

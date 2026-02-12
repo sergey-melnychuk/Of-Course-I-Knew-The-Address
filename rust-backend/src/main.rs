@@ -365,6 +365,7 @@ async fn index() -> Html<&'static str> {
     Html(include_str!("../../app/dist/index.html"))
 }
 
+#[derive(Debug)]
 struct AppError(StatusCode, anyhow::Error);
 
 impl IntoResponse for AppError {
@@ -386,6 +387,9 @@ fn bad_request(msg: impl std::fmt::Display) -> AppError {
 
 fn decode_hex(s: &str) -> anyhow::Result<Vec<u8>> {
     let s = s.strip_prefix("0x").unwrap_or(s);
+    if s.len() % 2 != 0 {
+        anyhow::bail!("odd-length hex string");
+    }
     (0..s.len())
         .step_by(2)
         .map(|i| u8::from_str_radix(&s[i..i + 2], 16).map_err(Into::into))
@@ -416,4 +420,103 @@ fn keccak256(input: &[&[u8]]) -> [u8; 32] {
     let mut out = [0u8; 32];
     hasher.finalize(&mut out);
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn decode_hex_with_0x_prefix() {
+        assert_eq!(decode_hex("0xdeadbeef").unwrap(), vec![0xde, 0xad, 0xbe, 0xef]);
+    }
+
+    #[test]
+    fn decode_hex_without_prefix() {
+        assert_eq!(decode_hex("cafebabe").unwrap(), vec![0xca, 0xfe, 0xba, 0xbe]);
+    }
+
+    #[test]
+    fn decode_hex_empty() {
+        assert_eq!(decode_hex("").unwrap(), Vec::<u8>::new());
+        assert_eq!(decode_hex("0x").unwrap(), Vec::<u8>::new());
+    }
+
+    #[test]
+    fn decode_hex_invalid_chars() {
+        assert!(decode_hex("0xZZZZ").is_err());
+    }
+
+    #[test]
+    fn decode_hex_odd_length() {
+        assert!(decode_hex("0xabc").is_err());
+    }
+
+    #[test]
+    fn encode_hex_roundtrip() {
+        let bytes = vec![0xde, 0xad, 0xbe, 0xef];
+        assert_eq!(encode_hex(&bytes), "0xdeadbeef");
+        assert_eq!(decode_hex(&encode_hex(&bytes)).unwrap(), bytes);
+    }
+
+    #[test]
+    fn encode_hex_empty() {
+        assert_eq!(encode_hex(&[]), "0x");
+    }
+
+    #[test]
+    fn encode_hex_leading_zeros() {
+        assert_eq!(encode_hex(&[0x00, 0x01]), "0x0001");
+    }
+
+    #[test]
+    fn validate_hex_correct_length() {
+        let addr = "0xd8da6bf26964af9d7eed9e03e53415d37aa96045";
+        let bytes = validate_hex(addr, 20, "address").unwrap();
+        assert_eq!(bytes.len(), 20);
+    }
+
+    #[test]
+    fn validate_hex_wrong_length() {
+        let err = validate_hex("0xdeadbeef", 20, "address");
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn validate_hex_bad_chars() {
+        let err = validate_hex("0xnothex!!", 5, "test");
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn keccak256_known_vector() {
+        let hash = keccak256(&[]);
+        assert_eq!(
+            encode_hex(&hash),
+            "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
+        );
+    }
+
+    #[test]
+    fn keccak256_hello() {
+        let hash = keccak256(&[b"hello"]);
+        assert_eq!(
+            encode_hex(&hash),
+            "0x1c8aff950685c2ed4bc3174f3472287b56d9517b9c948127319a09a7a36deac8"
+        );
+    }
+
+    #[test]
+    fn keccak256_multi_input() {
+        let combined = keccak256(&[b"hello", b"world"]);
+        let single = keccak256(&[b"helloworld"]);
+        assert_eq!(combined, single);
+    }
+
+    #[test]
+    fn keccak256_deterministic() {
+        let a = keccak256(&[b"test"]);
+        let b = keccak256(&[b"test"]);
+        assert_eq!(a, b);
+    }
 }

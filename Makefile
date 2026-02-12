@@ -1,4 +1,4 @@
-.PHONY: build build-frontend build-backend clean docker-build-linux docker-build docker-up docker-stop
+.PHONY: build build-frontend build-backend test test-contracts test-frontend test-rust clean docker-build-linux docker-build docker-up docker-stop
 
 # Build the single deployable binary (frontend baked into the Rust server).
 build: build-backend
@@ -13,6 +13,18 @@ build-frontend:
 
 build-backend: build-frontend artifacts
 	cd rust-backend && cargo build --release
+
+test: test-contracts test-frontend test-rust
+
+test-contracts:
+	npm i
+	npx hardhat test
+
+test-frontend:
+	cd app && pnpm install && pnpm test
+
+test-rust:
+	cd rust-backend && cargo test
 
 docker-build-linux:
 	docker build --platform linux/amd64 -t fund-router .

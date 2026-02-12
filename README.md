@@ -49,14 +49,13 @@ curl -X POST http://localhost:3001/route
 ```
 
 ```
-## Keep the serveer running, open a new console tab:
+## Keep the server running, open a new console tab:
 
 cd app
 pnpm i
 pnpm dev
 
-## Open http://localhost:3000 in browser.
-
+## Open http://localhost:5173 in browser.
 ```
 
 ### Sample deployments on Sepolia
@@ -120,3 +119,43 @@ Screenshots are in [`./doc`](./doc).
 ![Screen 2](./doc/screen2.png)
 
 ![Screen 3](./doc/screen3.png)
+
+### Simple deployment with docker
+
+#### Slower - build on the host
+
+```
+ssh root@$HOST
+git clone https://github.com/sergey-melnychuk/Of-Course-I-Knew-The-Address
+cd Of-Course-I-Knew-The-Address
+docker compose up -d --build
+```
+
+#### Faster - deliver container
+
+1. Build for linux/amd64 on your Mac
+
+```
+docker build --platform linux/amd64 -t fund-router .
+```
+
+1. Save to a tarball
+
+```
+docker save fund-router | gzip > fund-router.tar.gz
+```
+
+1. Ship to the droplet
+
+```
+scp fund-router.tar.gz root@$HOST$:~/workdir/
+```
+
+1. SSH in, load the image, launch
+
+```
+ssh root@$HOST
+cd workdir
+docker load < fund-router.tar.gz
+docker compose up -d
+```

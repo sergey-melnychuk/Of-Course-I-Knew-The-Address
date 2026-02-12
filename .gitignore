@@ -24,6 +24,9 @@ build/
 *.swp
 *.swo
 
+# Docker image tarballs
+*.tar.gz
+
 # OS
 .DS_Store
 Thumbs.db
